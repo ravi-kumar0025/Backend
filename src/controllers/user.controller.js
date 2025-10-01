@@ -343,16 +343,69 @@ const updateCoverImage=asyncHandler (async (req,res) =>{
     ) 
  }) 
 
-// const getUserchannelProfile=asyncHandler (async (req,res) =>{ 
-//     const { fullName }=req.params
-    
-//     if(!fullName?.trim()){
-//         throw new ApiError(400, "username is missing")
-//     }
+const getUserChannelProfile=asyncHandler(async(req,res)=>{
+    const {fullName} = req.params
 
+    if(!fullName?.trim()){
+        throw new ApiError(400,"User name is missing")
+    }
+    const channel = User.aggregate([
+        { 
+            $match:{
+                username:fullName?.toLowerCase()
+            }
+         },{
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+         },{
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"subsciber",
+                as:"subscribedTo"
+            }
+         },{
+            $addFields:{
+                subscribersCount:{
+                    $size:"$subscribers"
+                },
+                channelSubscribedToCount:{
+                    $size:"$subscribedTo"
+                }
+            },isSubscribed:{
+                $cond:{
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                }
+            }
+         },{
+                $project:{
+                        fullName:1,
+                        subscribersCount:1,
+                        channelSubscribedToCount:1,
+                        isSubscribed:1,
+                        avatar:1,
+                        coverImage:1,
+                        email:1
+                }
+         }
+    ])
 
-//  }) 
+    if(!channel?.length){
+        throw ApiError(404, "channel does not exist")
+    }
 
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0],"user channel fetched successfully")
+    )
+})
 
 export { 
     registerUser,
@@ -364,6 +417,6 @@ export {
     updateTextdetails,
     updateavatar,
     updateCoverImage,
-    // getUserchannelProfile,
+    getUserChannelProfile,
  }
 
